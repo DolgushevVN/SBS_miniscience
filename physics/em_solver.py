@@ -45,7 +45,8 @@ class EMSolver:
         b_tz = ufl.inner(Et, ufl.grad(Vz))
         b_zt = ufl.inner(ufl.grad(Ez), Vt)
         
-        a = (s_tt - self.k0_sq * t_tt) * dx + ufl.inner(1e-10 * Ez, Vz) * dx
+        # Честное уравнение без мусорных пенальти-членов
+        a = (s_tt - self.k0_sq * t_tt) * dx
         b = (s_zz - self.k0_sq * t_zz + b_tt + b_tz + b_zt) * dx
         
         self.domain.topology.create_connectivity(self.domain.topology.dim - 1, self.domain.topology.dim)
@@ -96,13 +97,12 @@ class EMSolver:
             raise RuntimeError("ЭМ-решатель не сошелся!")
 
     def calculate_power(self, E_func, neff, ng):
-        """Вычисляет оптическую мощность ненормированной моды"""
         Et, Ez = ufl.split(E_func)
         gamma_sq = (self.k0 * neff)**2
         dx = ufl.Measure("dx", domain=self.domain, subdomain_data=self.cell_tags)
         
         power = 0.0
-        for tag in [1, 2]: # Интегрируем по воздуху (1) и кремнию (2)
+        for tag in [1, 2]:
             cells = self.cell_tags.find(tag)
             if len(cells) > 0:
                 eps_val = 1.0 if tag == 1 else 3.48**2

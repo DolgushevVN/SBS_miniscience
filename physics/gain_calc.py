@@ -31,10 +31,10 @@ class BrillouinGainCalculator:
         s1 = -0.5 * const.epsilon_0 * (eps_core**2) * (p12 * EE[0] + p11 * EE[1] + p12 * EE[2])
         s5 = -0.5 * const.epsilon_0 * (eps_core**2) * (p44 * 2.0 * EE[3])
         
-        # Объемная сила с калибровкой 4.43 для точного соответствия 3D-моделям кремния
+        # Объемная сила (Честная физика, без коэффициента 4.43)
         f_bulk = ufl.as_vector([
-            (s0.dx(0) + s5.dx(1)) * 4.43,
-            (s5.dx(0) + s1.dx(1)) * 4.43,
+            s0.dx(0) + s5.dx(1),
+            s5.dx(0) + s1.dx(1),
             0.0
         ])
         overlap_bulk = fem.assemble_scalar(fem.form(ufl.inner(f_bulk, u_mech) * self.dx))
@@ -53,14 +53,13 @@ class BrillouinGainCalculator:
         print(f"[DEBUG] Сырой интеграл Bulk Overlap: {overlap_bulk:.5e}")
         print(f"[DEBUG] Сырой интеграл Boundary Overlap: {overlap_bdr:.5e}")
 
-        # Калиброванный префактор масштаба
-        prefactor = (Q_mech * omega_opt) / (4.0 * (power_opt**2) * P_mech) * 8.85e30
+        # Теоретический префактор (строго по уравнению 14 из статьи)
+        prefactor = (Q_mech * omega_opt) / (4.0 * (power_opt**2) * P_mech)
         
         gain_bdr = prefactor * np.abs(overlap_bdr)**2
         gain_bulk = prefactor * np.abs(overlap_bulk)**2
         gain_total = prefactor * np.abs(overlap_bulk + overlap_bdr)**2
         
         return gain_bdr, gain_bulk, gain_total
-
 
 

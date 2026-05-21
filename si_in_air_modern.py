@@ -17,21 +17,22 @@ def main():
     print("=== Начало расчета ВРМБ (Кремний в воздухе) ===")
     
     w_sim, h_sim = 1.5, 1.5
-    w_wg, h_wg = 0.45, 0.315
+    # Физически верные размеры: 450 x 230 nm (как в статье, Раздел V)
+    w_wg, h_wg = 0.45, 0.23 
     res_wg = 0.0075   
     res_clad = 0.0075 
 
-    # Точный кубический анизотропный тензор упругости кремния (Voigt 6x6)
+    # Точный кубический анизотропный тензор упругости кремния (статья: c11=164, c44=79, c12=64 GPa)
     C_silicon_cubic = np.array([
-        [165.7,  63.9,  63.9,   0.0,   0.0,   0.0],
-        [ 63.9, 165.7,  63.9,   0.0,   0.0,   0.0],
-        [ 63.9,  63.9, 165.7,   0.0,   0.0,   0.0],
-        [  0.0,   0.0,   0.0,  79.6,   0.0,   0.0],
-        [  0.0,   0.0,   0.0,   0.0,  79.6,   0.0],
-        [  0.0,   0.0,   0.0,   0.0,   0.0,  79.6]
+        [164.0,  64.0,  64.0,   0.0,   0.0,   0.0],
+        [ 64.0, 164.0,  64.0,   0.0,   0.0,   0.0],
+        [ 64.0,  64.0, 164.0,   0.0,   0.0,   0.0],
+        [  0.0,   0.0,   0.0,  79.0,   0.0,   0.0],
+        [  0.0,   0.0,   0.0,   0.0,  79.0,   0.0],
+        [  0.0,   0.0,   0.0,   0.0,   0.0,  79.0]
     ])
 
-    mat_si = Material("Silicon", rho=2.328, M=165.7, G=79.6, n_ref=3.48, p11=-0.09, p12=0.017)
+    mat_si = Material("Silicon", rho=2.328, M=164.0, G=79.0, n_ref=3.48, p11=-0.09, p12=0.017)
     mat_air = Material("Air", rho=1.2e-3, M=0.0, G=0.0, n_ref=1.0, p11=0.0, p12=0.0)
     materials = {1: mat_air, 2: mat_si}
 
@@ -75,7 +76,7 @@ def main():
     V_lag3 = fem.functionspace(domain, ("Lagrange", 1, (3,)))
     
     Et, Ez = ufl.split(E_opt)
-    E_vec_ufl = ufl.as_vector([Et[0], Et[1], 1j * Ez]) # Стабильный перенос
+    E_vec_ufl = ufl.as_vector([Et[0], Et[1], 1j * Ez]) 
     
     u_p = ufl.TrialFunction(V_lag3)
     v_p = ufl.TestFunction(V_lag3)
@@ -109,16 +110,17 @@ def main():
     gain_calc = BrillouinGainCalculator(submesh)
     gain_bdr, gain_bulk, gain_total = gain_calc.calculate_total_gain(
         E_opt_sub, U_mech, omega_opt, omega_mech, 
-        Q_mech=1000, power_opt=power_opt, P_mech=power_mech, 
+        Q_mech=249, power_opt=power_opt, P_mech=power_mech, # Указано корректное значение Q_mech из статьи (стр. 5)
         mat_core=mat_si, mat_clad=mat_air
     )
     
     print(f"\n=== Расчет окончен! ===")
-    print(f"Radiation pressure gain (на границе): {gain_bdr:.1f} W^-1 m^-1")
-    print(f"Bulk electrostriction gain (в объеме): {gain_bulk:.1f} W^-1 m^-1")
-    print(f"Total SBS Gain (Полное усиление): {gain_total:.1f} W^-1 m^-1")
+    print(f"Radiation pressure gain (на границе): {gain_bdr} W^-1 m^-1")
+    print(f"Bulk electrostriction gain (в объеме): {gain_bulk} W^-1 m^-1")
+    print(f"Total SBS Gain (Полное усиление): {gain_total} W^-1 m^-1")
 
 if __name__ == "__main__":
     main()
+
 
 
