@@ -14,8 +14,9 @@ def main():
     # 1. Параметры геометрии (мкм)
     w_sim, h_sim = 1.5, 1.5
     w_wg, h_wg = 0.45, 0.315
-    res_wg = 0.02   # Высокое разрешение внутри кремния
-    res_clad = 0.1  # Низкое разрешение в воздухе
+    # Идеально кратно размерам волновода (0.45 и 0.315), чтобы границы попадали ровно на узлы
+    res_wg = 0.0075   
+    res_clad = 0.0075 
 
     # 2. Создаем материалы
     # Silicon (Кремний) - тег 2
@@ -30,7 +31,7 @@ def main():
     )
     materials = {1: mat_air, 2: mat_si}
 
-    # 3. Генерируем сетку через Gmsh
+    # 3. Генерируем сетку через встроенный инструмент (без Gmsh)
     print("Генерация сетки...")
     domain, cell_tags, facet_tags = create_waveguide_mesh(w_sim, h_sim, w_wg, h_wg, res_wg, res_clad)
 
@@ -39,8 +40,8 @@ def main():
     print(f"Поиск оптической моды (длина волны {wavelength} мкм)...")
     em_solver = EMSolver(domain, cell_tags, materials, wavelength)
     
-    # Решаем с догадкой neff = n_si^2 (3.48^2 = ~12.1)
-    E_opt, n_eff = em_solver.solve(guess_neff=12.1, n_modes=1)
+    # Решаем с догадкой neff = n_si (3.48)
+    E_opt, n_eff = em_solver.solve(guess_neff=3.48, n_modes=1)
     print(f"Оптическая мода найдена! Эффективный индекс n_eff = {n_eff:.4f}")
 
     # 5. Акустическая часть (Звук)
@@ -49,7 +50,7 @@ def main():
     print("Поиск упругой (акустической) моды...")
     elastic_solver = ElasticSolver(domain, cell_tags, materials, q_b)
     
-    # В старом коде догадка была 8.5 ГГц
+    # Ищем моду вокруг частоты 8.5 ГГц
     U_mech, freq_mech = elastic_solver.solve(guess_freq=8.5, n_modes=1)
     print(f"Упругая мода найдена! Частота = {freq_mech:.4f} ГГц")
 
@@ -72,5 +73,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 

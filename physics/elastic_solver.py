@@ -1,6 +1,7 @@
 import ufl
+import basix.ufl
 from dolfinx import fem
-from dolfinx.fem.petsc import assemble_matrix # Прямой импорт!
+from dolfinx.fem.petsc import assemble_matrix
 from petsc4py import PETSc
 from slepc4py import SLEPc
 import numpy as np
@@ -15,32 +16,38 @@ class ElasticSolver:
     def __init__(self, domain, cell_tags, mat_dict, q_b):
         self.domain = domain
         self.cell_tags = cell_tags
+        self.mat_dict = mat_dict
         self.q_b = q_b
         
-        # Надежный способ создания векторного пространства для новых версий
-        v_el = ufl.VectorElement("Lagrange", domain.ufl_cell(), 2)
+        v_el = basix.ufl.element("Lagrange", domain.topology.cell_name(), 2, shape=(3,))
         self.V = fem.functionspace(domain, v_el)
         
-        self.rho = fem.Function(fem.functionspace(domain, ("DG", 0)))
-        
+        V_rho = fem.functionspace(domain, ("DG", 0))
+        self.rho = fem.Function(V_rho)
         for tag, mat in mat_dict.items():
             cells = cell_tags.find(tag)
-            self.rho.x.array[cells] = mat.rho
+            if len(cells) > 0:
+                self.rho.x.array[cells] = mat.rho
             
     def solve(self, guess_freq, n_modes=5):
-        u = ufl.TrialFunction(self.V)
-        v = ufl.TestFunction(self.V)
+        u, v = ufl.TrialFunction(self.V), ufl.TestFunction(self.V)
         dx = ufl.Measure("dx", domain=self.domain, subdomain_data=self.cell_tags)
-        
-        C_dummy = 1.0 
         
         grad_u = eps_T(u) + 1j * self.q_b * eps_Z(u)
         grad_v = eps_T(v) + 1j * self.q_b * eps_Z(v)
         
-        a = ufl.inner(C_dummy * grad_u, grad_v) * dx
+        a = None
+        for tag, mat in self.mat_dict.items():
+            C_np = mat.get_stiffness_tensor()
+            if mat.name == "Air": C_np = np.eye(6) * 1e-6
+            
+            C_mat = ufl.as_matrix(C_np.tolist())
+            stress_u = ufl.dot(C_mat, grad_u)
+            term = ufl.inner(stress_u, grad_v) * dx(tag)
+            a = term if a is None else a + term
+            
         b = self.rho * ufl.inner(u, v) * dx
         
-        # Используем assemble_matrix напрямую
         A = assemble_matrix(fem.form(a))
         A.assemble()
         B = assemble_matrix(fem.form(b))
@@ -59,18 +66,16 @@ class ElasticSolver:
         st.setType(SLEPc.ST.Type.SINVERT)
         eigensolver.solve()
         
-        print(f"Найдено акустических мод: {eigensolver.getConverged()}")
         if eigensolver.getConverged() > 0:
             val = eigensolver.getEigenvalue(0)
-            freq = np.sqrt(val.real) / (2 * np.pi)
-            
-            # Достаем собственную функцию
+            freq = np.sqrt(max(0, val.real)) / (2 * np.pi)
             vr, vi = A.getVecs()
             eigensolver.getEigenvector(0, vr, vi)
             u_func = fem.Function(self.V)
             u_func.x.array[:] = vr.array + 1j * vi.array
-            
             return u_func, freq
         else:
             raise RuntimeError("Упругий решатель не сошелся!")
+
+
 
