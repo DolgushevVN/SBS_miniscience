@@ -41,7 +41,7 @@ def main():
     em_solver = EMSolver(domain, cell_tags, materials, wavelength)
     
     # Решаем с догадкой neff = n_si (3.48)
-    E_opt, n_eff = em_solver.solve(guess_neff=3.48, n_modes=1)
+    E_opt, n_eff = em_solver.solve(guess_neff=2.5, n_modes=1)
     print(f"Оптическая мода найдена! Эффективный индекс n_eff = {n_eff:.4f}")
 
     # 5. Акустическая часть (Звук)
