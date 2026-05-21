@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+*.pyo
+*.py~
+
+# spder specific
+.spyproject
+
+# library folders
+pysbs/tmp
+PySBS.egg-info/
+build/
+dist/
+pysbs/PySBS.egg-info/
+bin/
+dist/
+figures/
+include/
+lib/
+lib64/
+share/
+pyenv.cfg
+
+
