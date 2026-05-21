@@ -17,8 +17,8 @@ dist/
 figures/
 include/
 lib/
-lib64/
+lib64
 share/
-pyenv.cfg
+pyvenv.cfg
 
 
