@@ -53,14 +53,18 @@ class ElasticSolver:
         st.setType(SLEPc.ST.Type.SINVERT)
         eigensolver.solve()
         
-        if eigensolver.getConverged() > 0:
-            val = eigensolver.getEigenvalue(0)
-            freq = np.sqrt(max(0, val.real)) / (2 * np.pi)
-            vr, vi = A.getVecs()
-            eigensolver.getEigenvector(0, vr, vi)
-            u_func = fem.Function(self.V)
-            u_func.x.array[:] = vr.array + 1j * vi.array
-            return u_func, freq
+        n_conv = eigensolver.getConverged()
+        modes = []
+        if n_conv > 0:
+            for i in range(min(n_conv, n_modes)):
+                val = eigensolver.getEigenvalue(i)
+                freq = np.sqrt(max(0, val.real)) / (2 * np.pi)
+                vr, vi = A.getVecs()
+                eigensolver.getEigenvector(i, vr, vi)
+                u_func = fem.Function(self.V)
+                u_func.x.array[:] = vr.array + 1j * vi.array
+                modes.append((u_func, freq))
+            return modes
         else:
             raise RuntimeError("Упругий решатель не сошелся!")
 
