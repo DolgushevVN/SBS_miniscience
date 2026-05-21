@@ -13,40 +13,27 @@ def eps_Z(u):
     return ufl.as_vector([0.0, 0.0, u[2], u[1], u[0], 0.0])
 
 class ElasticSolver:
-    def __init__(self, domain, cell_tags, mat_dict, q_b):
+    def __init__(self, domain, rho_val, stiffness_tensor, q_b):
         self.domain = domain
-        self.cell_tags = cell_tags
-        self.mat_dict = mat_dict
         self.q_b = q_b
+        self.rho_val = rho_val
+        self.C_np = stiffness_tensor
         
         v_el = basix.ufl.element("Lagrange", domain.topology.cell_name(), 2, shape=(3,))
         self.V = fem.functionspace(domain, v_el)
-        
-        V_rho = fem.functionspace(domain, ("DG", 0))
-        self.rho = fem.Function(V_rho)
-        for tag, mat in mat_dict.items():
-            cells = cell_tags.find(tag)
-            if len(cells) > 0:
-                self.rho.x.array[cells] = mat.rho
             
-    def solve(self, guess_freq, n_modes=5):
+    def solve(self, guess_freq, n_modes=1):
         u, v = ufl.TrialFunction(self.V), ufl.TestFunction(self.V)
-        dx = ufl.Measure("dx", domain=self.domain, subdomain_data=self.cell_tags)
+        dx = ufl.Measure("dx", domain=self.domain)
         
         grad_u = eps_T(u) + 1j * self.q_b * eps_Z(u)
         grad_v = eps_T(v) + 1j * self.q_b * eps_Z(v)
         
-        a = None
-        for tag, mat in self.mat_dict.items():
-            C_np = mat.get_stiffness_tensor()
-            if mat.name == "Air": C_np = np.eye(6) * 1e-6
-            
-            C_mat = ufl.as_matrix(C_np.tolist())
-            stress_u = ufl.dot(C_mat, grad_u)
-            term = ufl.inner(stress_u, grad_v) * dx(tag)
-            a = term if a is None else a + term
-            
-        b = self.rho * ufl.inner(u, v) * dx
+        C_mat = ufl.as_matrix(self.C_np.tolist())
+        stress_u = ufl.dot(C_mat, grad_u)
+        
+        a = ufl.inner(stress_u, grad_v) * dx
+        b = self.rho_val * ufl.inner(u, v) * dx
         
         A = assemble_matrix(fem.form(a))
         A.assemble()
@@ -77,5 +64,10 @@ class ElasticSolver:
         else:
             raise RuntimeError("Упругий решатель не сошелся!")
 
+    def calculate_power(self, u_func, freq_mech):
+        omega = 2.0 * np.pi * freq_mech * 1e9
+        dx = ufl.Measure("dx", domain=self.domain)
+        term = 0.5 * (omega**2) * self.rho_val * ufl.inner(u_func, u_func) * dx
+        return fem.assemble_scalar(fem.form(term)).real
 
 
