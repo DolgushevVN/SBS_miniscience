@@ -71,7 +71,10 @@ class ElasticSolver:
     def calculate_power(self, u_func, freq_mech):
         omega = 2.0 * np.pi * freq_mech * 1e9
         dx = ufl.Measure("dx", domain=self.domain)
-        term = 0.5 * (omega**2) * self.rho_val * ufl.inner(u_func, u_func) * dx
-        return fem.assemble_scalar(fem.form(term)).real
+        # Плотность переводим из g/cm^3 в kg/m^3 ( * 1000.0)
+        # Площадь dx переводим из мкм^2 в м^2 ( * 1e-12)
+        term = 0.5 * (omega**2) * (self.rho_val * 1000.0) * ufl.inner(u_func, u_func) * dx
+        return fem.assemble_scalar(fem.form(term)).real * 1e-12
+
 
 

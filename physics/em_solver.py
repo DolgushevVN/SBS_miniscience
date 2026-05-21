@@ -4,7 +4,6 @@ from dolfinx import fem
 from dolfinx import mesh as dmesh
 from dolfinx.fem.petsc import assemble_matrix
 import scipy.constants as const
-from petsc4py import PETSc
 from slepc4py import SLEPc
 import numpy as np
 
@@ -37,6 +36,7 @@ class EMSolver:
         Vt, Vz = ufl.split(v)
         dx = ufl.Measure("dx", domain=self.domain, subdomain_data=self.cell_tags)
         
+        # ufl.inner автоматически сопрягает вторую функцию (v), так что математика точна
         s_tt = ufl.inner(curl_t(Et), curl_t(Vt))
         t_tt = self.eps_r * ufl.inner(Et, Vt)
         s_zz = ufl.inner(ufl.grad(Ez), ufl.grad(Vz))
@@ -45,7 +45,6 @@ class EMSolver:
         b_tz = ufl.inner(Et, ufl.grad(Vz))
         b_zt = ufl.inner(ufl.grad(Ez), Vt)
         
-        # Честное уравнение без мусорных пенальти-членов
         a = (s_tt - self.k0_sq * t_tt) * dx
         b = (s_zz - self.k0_sq * t_zz + b_tt + b_tz + b_zt) * dx
         
@@ -74,7 +73,6 @@ class EMSolver:
         eigensolver = SLEPc.EPS().create()
         eigensolver.setOperators(A, B)
         eigensolver.setProblemType(SLEPc.EPS.ProblemType.GNHEP)
-        
         target = -((2.0 * np.pi * guess_neff / self.wavelength)**2)
         eigensolver.setTarget(target)
         eigensolver.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_MAGNITUDE)
@@ -107,7 +105,6 @@ class EMSolver:
             if len(cells) > 0:
                 eps_val = 1.0 if tag == 1 else 3.48**2
                 term = 0.5 * (const.c / ng) * const.epsilon_0 * eps_val * (ufl.inner(Et, Et) + gamma_sq * ufl.inner(Ez, Ez)) * dx(tag)
-                power += fem.assemble_scalar(fem.form(term)).real
+                power += fem.assemble_scalar(fem.form(term)).real * 1e-12
         return power
-
 
